@@ -10,6 +10,8 @@ import os
 from fastapi.middleware.cors import CORSMiddleware
 import whisper
 import tempfile
+from pydantic import BaseModel
+from typing import List
 
 app = FastAPI()
 load_dotenv()
@@ -80,3 +82,44 @@ async def evaluate_answer(
 
     # score와 advice 둘 다 반환
     return {"score": score, "advice": advice}
+
+# -- 피드백 요약 --
+class SummaryRequest(BaseModel):
+    advices: List[str]
+
+@app.post("/api/interview-summary")
+async def interview_summary(req: SummaryRequest):
+    joined = "\n".join([f"- {a}" for a in req.advices])
+
+    prompt = f"""
+    너는 전문 면접관이야.
+
+    아래는 면접 중 AI가 각 질문마다 생성한 조언들이야:
+    {joined}
+
+    이 조언들을 종합해서
+    면접 결과 화면에 보여줄 최종 피드백을 작성해줘.
+
+    규칙:
+    1) 제목은 10~15자 이내의 간결한 문장
+    2) 내용은 한 문장, 부드러운 톤의 개선 조언
+    반드시 아래 형식으로 출력해줘: 제목/내용 (출력 예시:바디 랭귀지 관리/손동작을 줄이고 시선과 말의 흐름을 안정시키면 더 신뢰감 있는 인상을 줄 수 있어요.)
+    """
+
+    response = model.generate_content(prompt)
+    raw = response.text.strip()
+    print("AI 종합 평가:", raw)
+
+    if "/" in raw:
+        title, message = raw.split("/", 1)
+        title = title.strip()
+        message = message.strip()
+    else:
+        # fallback
+        title = "AI 종합 피드백"
+        message = raw
+
+    return {
+        "feedback_title": title,
+        "feedback_message": message
+    }

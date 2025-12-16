@@ -68,10 +68,10 @@
 
         <div class="notes">
           <p>
-            <strong>면접 도중 과도한 바디 랭귀지, 과도한 손 떨림</strong>이 감지되었어요!
+            <strong>{{ feedbackTitle }}</strong>이 감지되었어요!
           </p>
           <p class="muted">
-            과도한 바디 랭귀지와 손 떨림은 주의가 산만해 보일 수 있어서 보기 안좋아요!
+            {{ feedbackMessage }}
           </p>
           <p class="muted small">(* 이해를 돕기 위한 예시 이미지 입니다)</p>
         </div>
@@ -105,7 +105,9 @@ const route = useRoute()
 
 // ===== 화면 상태 =====
 const photo = ref(null)
-const position = route.query.position || '취업'
+const position = ref(route.query.position || '취업')
+const feedbackTitle = ref(route.query.feedback_title || 'AI 종합 피드백')
+const feedbackMessage = ref(route.query.feedback_message || '')
 const intro = ref('안녕하세요! 저는 어제보다 더 나은 내일을 만드는 FE 개발자 입니다!')
 const name = ref('')
 
@@ -158,8 +160,8 @@ async function saveResultToSupabase() {
     position: position.value,
     intro: intro.value,
     photo_url: photo.value,
-    feedback_title: '바디 랭귀지 감지',
-    feedback_message: '과도한 손떨림이 면접 집중도에 영향을 줄 수 있습니다.'
+    feedback_title: feedbackTitle.value,
+    feedback_message: feedbackMessage.value
   }
 
   console.log('[Result] 저장 요청:', payload)
@@ -226,7 +228,7 @@ async function loadResultData() {
     try {
       const { data: form, error: formError } = await supabase
         .from('interview_forms')
-        .select('position, score, photo, questions')
+        .select('position, photo')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
         .limit(1)
@@ -234,14 +236,10 @@ async function loadResultData() {
 
       if (formError) {
         console.log('[Result] 인터뷰 폼 조회 실패 또는 없음:', formError.message)
-      } else if (form) {
-        if (form.position) position.value = form.position
+      } 
+      if (form) {
+        if (!position.value && form.position) position.value = form.position
         if (form.photo) photo.value = form.photo
-        if (typeof form.score === 'number') score.value = form.score
-
-        if (Array.isArray(form.questions) && form.questions[0]?.content) {
-          intro.value = form.questions[0].content.trim()
-        }
       }
     } catch (formErr) {
       console.error('[Result] 인터뷰 폼 조회 중 예외:', formErr)

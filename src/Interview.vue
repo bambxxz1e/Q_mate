@@ -219,8 +219,10 @@ function handleMicClick() {
   }
 }
 
-// ✅ 점수 배열
+// ✅ 배열
 const scores = ref<number[]>([])
+const adviceList = ref<string[]>([])
+
 // ✅ 질문 카운트
 const questionCount = ref(0)
 const maxQuestions = 5
@@ -238,6 +240,7 @@ async function sendToAI(blob: Blob) {
     const newScore = res.data.score
     const advice = res.data.advice
 
+    adviceList.value.push(advice)
     scores.value.push(newScore)
     questionCount.value++
 
@@ -254,7 +257,17 @@ async function sendToAI(blob: Blob) {
     if (questionCount.value >= maxQuestions) {
       // ✅ 질문 모두 끝나면 평균 계산 후 결과로 이동
       const avgScore = scores.value.reduce((a, b) => a + b, 0) / scores.value.length
-      router.push({ path: '/result', query: { avgScore: Math.round(avgScore), position: position.value } })
+      const summary = await requestSummary()
+      
+      router.push({
+        path: '/result',
+        query: {
+          avgScore,
+          position: position.value,
+          feedback_title: summary.feedback_title,
+          feedback_message: summary.feedback_message
+        }
+      })
     } else {
       // ✅ 다음 질문 자동 요청
       refreshQuestion()
@@ -263,6 +276,18 @@ async function sendToAI(blob: Blob) {
     console.error(err)
     alert('답변 평가 중 오류가 발생했습니다.')
   }
+}
+
+// 피드백 요약
+async function requestSummary() {
+  const res = await axios.post(
+    'http://localhost:8000/api/interview-summary',
+    {
+      advices: adviceList.value
+    }
+  )
+
+  return res.data
 }
 
 // 카메라 시작
@@ -310,12 +335,15 @@ async function goNext() {
       ? Math.round(scores.value.reduce((a, b) => a + b, 0) / scores.value.length)
       : 0
 
-  // 결과 페이지로 이동하면서 쿼리로 전달
+  const summary = await requestSummary()
+  
   router.push({
     path: '/result',
     query: {
-      avgScore: avgScore,
-      position: position.value
+      avgScore,
+      position: position.value,
+      feedback_title: summary.feedback_title,
+      feedback_message: summary.feedback_message
     }
   })
 }
